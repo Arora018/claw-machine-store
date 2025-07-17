@@ -43,3 +43,16 @@ Thumbs.db
 # APK files
 *.apk
 *.aab 
+
+# Security & Sensitive Data
+backend/data/users.json
+backend/data/admin-credentials.json
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*credentials*
+*secrets*
+production.env
+.env.production

@@ -158,15 +158,20 @@ const requireRole = (roles) => {
 const initializeDatabase = async () => {
   try {
     // Create admin user if doesn't exist
-    const adminExists = await User.findOne({ username: 'admin' });
+    const adminUsername = process.env.ADMIN_USERNAME || 'admin';
+    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@yanoi.com';
+    
+    const adminExists = await User.findOne({ username: adminUsername });
     if (!adminExists) {
-      const hashedPassword = await bcrypt.hash('admin123', 10);
+      const hashedPassword = await bcrypt.hash(adminPassword, 10);
       await User.create({
-        username: 'admin',
+        username: adminUsername,
+        email: adminEmail,
         password: hashedPassword,
         role: 'admin'
       });
-      console.log('✅ Admin user created');
+      console.log('✅ Admin user created with username:', adminUsername);
     }
 
     // Create default products if none exist
