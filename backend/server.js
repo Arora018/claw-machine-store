@@ -500,6 +500,12 @@ app.use((req, res) => {
 // Start server
 const startServer = async () => {
   try {
+    console.log('🔄 Starting server...');
+    console.log('📋 Environment variables loaded:');
+    console.log(`   ADMIN_USERNAME: ${process.env.ADMIN_USERNAME || 'NOT SET'}`);
+    console.log(`   ADMIN_PASSWORD: ${process.env.ADMIN_PASSWORD ? 'SET' : 'NOT SET'}`);
+    console.log(`   MONGODB_URI: ${process.env.MONGODB_URI ? 'SET' : 'NOT SET'}`);
+    
     await connectDB();
     await initializeDatabase();
     
