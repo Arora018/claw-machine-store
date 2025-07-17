@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: claw-machine-backend
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: MONGODB_URI
+        fromDatabase:
+          name: clawstore-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+        
+databases:
+  - name: clawstore-db
+    databaseName: clawstore
+    user: clawstore 

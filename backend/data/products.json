@@ -1,0 +1,58 @@
+[
+  {
+    "_id": "1",
+    "name": "1 Coin",
+    "price": 100,
+    "cost": 0,
+    "category": "other",
+    "isActive": true
+  },
+  {
+    "_id": "2",
+    "name": "7 Coins",
+    "price": 500,
+    "cost": 0,
+    "category": "other",
+    "isActive": true
+  },
+  {
+    "_id": "3",
+    "name": "15 Coins",
+    "price": 1000,
+    "cost": 0,
+    "category": "other",
+    "isActive": true
+  },
+  {
+    "_id": "4",
+    "name": "Teddy Bear",
+    "price": 250,
+    "cost": 150,
+    "category": "plush_toy",
+    "isActive": true
+  },
+  {
+    "_id": "5",
+    "name": "Pokemon Figure",
+    "price": 400,
+    "cost": 200,
+    "category": "figurine",
+    "isActive": true
+  },
+  {
+    "_id": "6",
+    "name": "Hello Kitty Plush",
+    "price": 350,
+    "cost": 180,
+    "category": "plush_toy",
+    "isActive": true
+  },
+  {
+    "_id": "7",
+    "name": "Gummy Bears",
+    "price": 80,
+    "cost": 40,
+    "category": "candy",
+    "isActive": true
+  }
+]

@@ -1,0 +1,22 @@
+[
+  {
+    "_id": "1",
+    "machineId": "CM001",
+    "name": "Main Claw Machine",
+    "location": "Entrance",
+    "status": "active",
+    "coinCount": 45,
+    "currentToyCount": 12,
+    "maxCapacity": 20
+  },
+  {
+    "_id": "2",
+    "machineId": "CM002",
+    "name": "Mini Claw Machine",
+    "location": "Corner",
+    "status": "active",
+    "coinCount": 23,
+    "currentToyCount": 8,
+    "maxCapacity": 15
+  }
+]

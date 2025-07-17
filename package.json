@@ -1,0 +1,12 @@
+{
+  "name": "claw-machine-store-tests",
+  "version": "1.0.0",
+  "description": "Test script for Claw Machine Store deployment",
+  "main": "test-deployment.js",
+  "scripts": {
+    "test": "node test-deployment.js"
+  },
+  "dependencies": {
+    "axios": "^1.10.0"
+  }
+}

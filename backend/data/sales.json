@@ -1,0 +1,86 @@
+[
+  {
+    "_id": "test_sale_123",
+    "clientId": "test_sale_123",
+    "saleNumber": "SALE-000001",
+    "items": [
+      {
+        "product": "1",
+        "quantity": 2
+      },
+      {
+        "product": "4",
+        "quantity": 1
+      }
+    ],
+    "paymentMethod": "cash",
+    "total": 450,
+    "subtotal": 450,
+    "tax": 0,
+    "cashier": "1",
+    "status": "completed",
+    "createdAt": "2025-07-03T08:48:00.000Z",
+    "syncedAt": "2025-07-03T08:48:48.612Z"
+  },
+  {
+    "clientId": "offline_sale_1",
+    "items": [
+      {
+        "product": "2",
+        "quantity": 1
+      }
+    ],
+    "paymentMethod": "upi",
+    "total": 500,
+    "timestamp": "2025-07-03T08:45:00.000Z",
+    "_id": "offline_sale_1",
+    "saleNumber": "SALE-000002",
+    "syncedAt": "2025-07-03T08:49:14.913Z"
+  },
+  {
+    "clientId": "offline_sale_2",
+    "items": [
+      {
+        "product": "3",
+        "quantity": 1
+      }
+    ],
+    "paymentMethod": "card",
+    "total": 1000,
+    "timestamp": "2025-07-03T08:46:00.000Z",
+    "_id": "offline_sale_2",
+    "saleNumber": "SALE-000004",
+    "syncedAt": "2025-07-03T08:49:14.913Z"
+  },
+  {
+    "_id": "1751610086597",
+    "clientId": null,
+    "saleNumber": "SALE-000004",
+    "items": [
+      {
+        "product": "3",
+        "quantity": 3
+      },
+      {
+        "product": "2",
+        "quantity": 1
+      },
+      {
+        "product": "1",
+        "quantity": 1
+      },
+      {
+        "product": "5",
+        "quantity": 1
+      }
+    ],
+    "paymentMethod": "cash",
+    "total": 4000,
+    "subtotal": 4000,
+    "tax": 0,
+    "cashier": "1",
+    "status": "completed",
+    "createdAt": "2025-07-04T06:21:26.597Z",
+    "syncedAt": "2025-07-04T06:21:26.597Z"
+  }
+]
