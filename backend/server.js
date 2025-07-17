@@ -13,8 +13,8 @@ const PORT = process.env.PORT || 3000;
 const corsOptions = {
   origin: [
     'http://localhost:3001',
-    'https://your-admin-dashboard.vercel.app', // Update with your deployed admin URL
-    'https://your-admin-dashboard.netlify.app', // Update with your deployed admin URL
+    'https://claw-machine-store.vercel.app', // Your deployed admin URL
+    'https://claw-machine-store.vercel.app/login', // Login page
     process.env.FRONTEND_URL
   ].filter(Boolean),
   credentials: true,

@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claw Machine Store - System Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { border: 1px solid #ccc; padding: 15px; margin: 10px 0; }
+        .result { padding: 10px; margin: 10px 0; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        button { padding: 10px 20px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Claw Machine Store - System Test</h1>
+    
+    <div class="test-section">
+        <h2>1. Backend Health Check</h2>
+        <button onclick="testBackendHealth()">Test Backend Health</button>
+        <div id="healthResult" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. API Authentication</h2>
+        <button onclick="testAuthentication()">Test Login</button>
+        <div id="authResult" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. Products API</h2>
+        <button onclick="testProductsAPI()">Test Products API</button>
+        <div id="productsResult" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>4. Admin Dashboard</h2>
+        <a href="https://claw-machine-store.vercel.app/login" target="_blank">
+            <button>Open Admin Dashboard</button>
+        </a>
+        <p><strong>Login:</strong> admin / admin123</p>
+    </div>
+
+    <script>
+        const API_BASE = 'https://claw-machine-backend.onrender.com';
+        let authToken = null;
+
+        async function testBackendHealth() {
+            const resultDiv = document.getElementById('healthResult');
+            resultDiv.innerHTML = '🔍 Testing backend health...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            ✅ Backend Health: SUCCESS<br>
+                            Status: ${data.status}<br>
+                            Environment: ${data.environment}<br>
+                            Timestamp: ${data.timestamp}
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Backend Health: FAILED (${response.status})</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Backend Health: ERROR - ${error.message}</div>`;
+            }
+        }
+
+        async function testAuthentication() {
+            const resultDiv = document.getElementById('authResult');
+            resultDiv.innerHTML = '🔍 Testing authentication...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: 'admin',
+                        password: 'admin123'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    authToken = data.token;
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            ✅ Authentication: SUCCESS<br>
+                            User: ${data.user.username}<br>
+                            Role: ${data.user.role}<br>
+                            Token: ${data.token ? 'Received' : 'Missing'}
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Authentication: FAILED<br>Message: ${data.message}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Authentication: ERROR - ${error.message}</div>`;
+            }
+        }
+
+        async function testProductsAPI() {
+            const resultDiv = document.getElementById('productsResult');
+            
+            if (!authToken) {
+                resultDiv.innerHTML = '<div class="error">❌ Please test authentication first to get token</div>';
+                return;
+            }
+            
+            resultDiv.innerHTML = '🔍 Testing products API...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/products`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            ✅ Products API: SUCCESS<br>
+                            Products found: ${data.length}<br>
+                            ${data.length > 0 ? 'Sample: ' + data[0].name : 'No products yet (normal for new setup)'}
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Products API: FAILED<br>Status: ${response.status}<br>Message: ${data.message}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Products API: ERROR - ${error.message}</div>`;
+            }
+        }
+
+        // Auto-run health check on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            testBackendHealth();
+        });
+    </script>
+</body>
+</html> 
