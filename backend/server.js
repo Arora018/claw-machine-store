@@ -50,6 +50,23 @@ app.get('/debug-env', (req, res) => {
   });
 });
 
+// Debug endpoint to check admin user in database
+app.get('/debug-admin', async (req, res) => {
+  try {
+    const adminUser = await User.findOne({ username: 'admin' });
+    res.json({
+      exists: !!adminUser,
+      username: adminUser ? adminUser.username : null,
+      email: adminUser ? adminUser.email : null,
+      role: adminUser ? adminUser.role : null,
+      createdAt: adminUser ? adminUser.createdAt : null,
+      passwordSet: adminUser ? !!adminUser.password : false
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // MongoDB Atlas connection
 const connectDB = async () => {
   try {
