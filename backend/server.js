@@ -67,6 +67,27 @@ app.get('/debug-admin', async (req, res) => {
   }
 });
 
+// Reset admin password endpoint (for fixing password issues)
+app.post('/reset-admin-password', async (req, res) => {
+  try {
+    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+    const hashedPassword = await bcrypt.hash(adminPassword, 10);
+    
+    const result = await User.updateOne(
+      { username: 'admin' },
+      { password: hashedPassword }
+    );
+    
+    res.json({ 
+      success: true,
+      message: 'Admin password reset successfully',
+      modified: result.modifiedCount > 0
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // MongoDB Atlas connection
 const connectDB = async () => {
   try {
