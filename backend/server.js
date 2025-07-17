@@ -12,9 +12,12 @@ const PORT = process.env.PORT || 3000;
 // Enhanced CORS configuration for cloud deployment
 const corsOptions = {
   origin: [
+    'http://localhost:3000', // Local development
     'http://localhost:3001',
-    'https://claw-machine-store.vercel.app', // Your deployed admin URL
-    'https://claw-machine-store.vercel.app/login', // Login page
+    'https://claw-machine-store.vercel.app', // Old admin URL
+    'https://claw-machine-store.vercel.app/login', // Old login page
+    'https://yanoi-admin-dashboard.vercel.app', // New admin URL
+    'https://yanoi-admin-dashboard.vercel.app/login', // New login page
     process.env.FRONTEND_URL
   ].filter(Boolean),
   credentials: true,
