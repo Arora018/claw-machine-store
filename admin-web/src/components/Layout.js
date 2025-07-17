@@ -73,7 +73,7 @@ const Layout = ({ children }) => {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            Claw Machine Store - Admin Dashboard
+            Yanoi - Admin Dashboard
           </Typography>
           <IconButton color="inherit" onClick={handleMenuClick}>
             <Avatar sx={{ width: 32, height: 32 }}>

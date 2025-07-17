@@ -33,7 +33,7 @@ const Login = () => {
       <Box sx={{ mt: 8, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <Paper elevation={3} sx={{ p: 4, width: '100%' }}>
           <Typography variant="h4" align="center" gutterBottom>
-            Claw Machine Store
+            Yanoi
           </Typography>
           <Typography variant="h6" align="center" color="textSecondary" gutterBottom>
             Admin Dashboard

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard Debug</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 4px solid #ccc;
+        }
+        .success { 
+            background-color: #d4edda; 
+            border-left-color: #28a745; 
+            color: #155724; 
+        }
+        .error { 
+            background-color: #f8d7da; 
+            border-left-color: #dc3545; 
+            color: #721c24; 
+        }
+        .info { 
+            background-color: #d1ecf1; 
+            border-left-color: #17a2b8; 
+            color: #0c5460; 
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Admin Dashboard Debug Tool</h1>
+        <p>This tool helps debug the frontend login issues.</p>
+        
+        <div>
+            <h3>Test Login</h3>
+            <input type="text" id="username" placeholder="Username" value="admin">
+            <input type="password" id="password" placeholder="Password" value="admin123">
+            <button onclick="testLogin()">Test Login</button>
+        </div>
+        
+        <div>
+            <h3>Quick Tests</h3>
+            <button onclick="checkAPIUrl()">Check API URL</button>
+            <button onclick="testCORS()">Test CORS</button>
+            <button onclick="testBackendHealth()">Test Backend Health</button>
+        </div>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const resultsDiv = document.getElementById('results');
+        
+        function addResult(html) {
+            resultsDiv.innerHTML += html;
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+        }
+        
+        function clearResults() {
+            resultsDiv.innerHTML = '';
+        }
+        
+        function checkAPIUrl() {
+            clearResults();
+            
+            // Check what API URL would be used
+            const apiUrl = window.location.hostname === 'localhost' 
+                ? 'http://localhost:3000/api' 
+                : 'https://claw-machine-backend.onrender.com/api';
+            
+            addResult(`
+                <div class="result info">
+                    🔍 API URL Detection:<br>
+                    <strong>Current domain:</strong> ${window.location.hostname}<br>
+                    <strong>Would use API:</strong> ${apiUrl}<br>
+                    <strong>Full backend URL:</strong> ${apiUrl.replace('/api', '')}
+                </div>
+            `);
+        }
+        
+        async function testCORS() {
+            addResult('<div class="result info">🌐 Testing CORS...</div>');
+            
+            const apiUrl = window.location.hostname === 'localhost' 
+                ? 'http://localhost:3000/api' 
+                : 'https://claw-machine-backend.onrender.com/api';
+            
+            try {
+                const response = await fetch(`${apiUrl.replace('/api', '')}/health`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult(`
+                        <div class="result success">
+                            ✅ CORS Test: SUCCESS<br>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `);
+                } else {
+                    addResult(`<div class="result error">❌ CORS Test: FAILED (${response.status})</div>`);
+                }
+            } catch (error) {
+                addResult(`<div class="result error">❌ CORS Test: ERROR - ${error.message}</div>`);
+            }
+        }
+        
+        async function testBackendHealth() {
+            addResult('<div class="result info">🔍 Testing backend health...</div>');
+            
+            const apiUrl = window.location.hostname === 'localhost' 
+                ? 'http://localhost:3000/api' 
+                : 'https://claw-machine-backend.onrender.com/api';
+            
+            try {
+                const response = await fetch(`${apiUrl.replace('/api', '')}/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addResult(`
+                        <div class="result success">
+                            ✅ Backend Health: SUCCESS<br>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `);
+                } else {
+                    addResult(`<div class="result error">❌ Backend Health: FAILED (${response.status})</div>`);
+                }
+            } catch (error) {
+                addResult(`<div class="result error">❌ Backend Health: ERROR - ${error.message}</div>`);
+            }
+        }
+        
+        async function testLogin() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            addResult('<div class="result info">🔐 Testing login...</div>');
+            
+            const apiUrl = window.location.hostname === 'localhost' 
+                ? 'http://localhost:3000/api' 
+                : 'https://claw-machine-backend.onrender.com/api';
+            
+            try {
+                const response = await fetch(`${apiUrl}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addResult(`
+                        <div class="result success">
+                            ✅ Login: SUCCESS<br>
+                            <strong>Token:</strong> ${data.token ? 'Generated' : 'Missing'}<br>
+                            <strong>User:</strong> ${data.user?.username} (${data.user?.role})<br>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `);
+                } else {
+                    addResult(`
+                        <div class="result error">
+                            ❌ Login: FAILED (${response.status})<br>
+                            <strong>Message:</strong> ${data.message}<br>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `);
+                }
+            } catch (error) {
+                addResult(`<div class="result error">❌ Login: ERROR - ${error.message}</div>`);
+            }
+        }
+        
+        // Auto-run some tests on page load
+        window.addEventListener('load', () => {
+            checkAPIUrl();
+        });
+    </script>
+</body>
+</html> 

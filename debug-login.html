@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Login - Claw Machine Store</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { padding: 15px; margin: 10px 0; border: 1px solid #ccc; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #cce7ff; color: #004085; }
+        button { padding: 10px 20px; margin: 10px 0; font-size: 16px; }
+        pre { background-color: #f8f9fa; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug Login Issues</h1>
+    <p>This page will help diagnose login problems with your admin dashboard.</p>
+    
+    <div class="result info">
+        <h3>Current Configuration:</h3>
+        <p><strong>Backend API:</strong> https://claw-machine-backend.onrender.com</p>
+        <p><strong>Admin Dashboard:</strong> https://claw-machine-store.vercel.app</p>
+        <p><strong>Login Endpoint:</strong> https://claw-machine-backend.onrender.com/api/auth/login</p>
+    </div>
+
+    <button onclick="testLogin()">🧪 Test Login Directly</button>
+    <button onclick="testCORS()">🌐 Test CORS</button>
+    <button onclick="testBackend()">⚡ Test Backend Health</button>
+
+    <div id="results"></div>
+
+    <script>
+        const API_BASE = 'https://claw-machine-backend.onrender.com';
+        const resultsDiv = document.getElementById('results');
+
+        function addResult(html) {
+            resultsDiv.innerHTML += html;
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+        }
+
+        async function testBackend() {
+            addResult('<div class="result info">🔍 Testing backend health...</div>');
+            
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addResult(`
+                        <div class="result success">
+                            ✅ Backend Health: SUCCESS<br>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `);
+                } else {
+                    addResult(`<div class="result error">❌ Backend Health: FAILED (${response.status})</div>`);
+                }
+            } catch (error) {
+                addResult(`<div class="result error">❌ Backend Health: ERROR<br>${error.message}</div>`);
+            }
+        }
+
+        async function testCORS() {
+            addResult('<div class="result info">🌐 Testing CORS configuration...</div>');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/products`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.status === 401) {
+                    addResult(`
+                        <div class="result success">
+                            ✅ CORS: SUCCESS<br>
+                            Got 401 Unauthorized (expected - means CORS is working)<br>
+                            Your admin dashboard can communicate with the backend.
+                        </div>
+                    `);
+                } else {
+                    addResult(`<div class="result error">❌ CORS: Unexpected response (${response.status})</div>`);
+                }
+            } catch (error) {
+                if (error.message.includes('CORS')) {
+                    addResult(`
+                        <div class="result error">
+                            ❌ CORS: BLOCKED<br>
+                            Error: ${error.message}<br>
+                            <strong>Solution:</strong> Backend needs to allow https://claw-machine-store.vercel.app
+                        </div>
+                    `);
+                } else {
+                    addResult(`<div class="result error">❌ CORS Test: ERROR<br>${error.message}</div>`);
+                }
+            }
+        }
+
+        async function testLogin() {
+            addResult('<div class="result info">🔍 Testing login API...</div>');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: 'admin',
+                        password: 'admin123'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addResult(`
+                        <div class="result success">
+                            ✅ Login: SUCCESS<br>
+                            <strong>User:</strong> ${data.user.username}<br>
+                            <strong>Role:</strong> ${data.user.role}<br>
+                            <strong>Token:</strong> ${data.token ? 'Received' : 'Missing'}<br>
+                            <strong>Admin dashboard should work now!</strong>
+                        </div>
+                    `);
+                } else {
+                    addResult(`
+                        <div class="result error">
+                            ❌ Login: FAILED (${response.status})<br>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `);
+                }
+            } catch (error) {
+                if (error.message.includes('CORS')) {
+                    addResult(`
+                        <div class="result error">
+                            ❌ Login: CORS ERROR<br>
+                            The admin dashboard cannot communicate with the backend.<br>
+                            <strong>Solution:</strong> Wait for Render to redeploy with CORS fixes.
+                        </div>
+                    `);
+                } else {
+                    addResult(`<div class="result error">❌ Login: ERROR<br>${error.message}</div>`);
+                }
+            }
+        }
+
+        // Auto-run tests on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            testBackend();
+        });
+    </script>
+</body>
+</html> 
