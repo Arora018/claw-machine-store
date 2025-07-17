@@ -38,55 +38,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Debug endpoint to check environment variables (remove in production)
-app.get('/debug-env', (req, res) => {
-  res.json({
-    hasAdminUsername: !!process.env.ADMIN_USERNAME,
-    hasAdminPassword: !!process.env.ADMIN_PASSWORD,
-    hasAdminEmail: !!process.env.ADMIN_EMAIL,
-    adminUsername: process.env.ADMIN_USERNAME || 'NOT SET',
-    mongoUri: process.env.MONGODB_URI ? 'SET' : 'NOT SET',
-    nodeEnv: process.env.NODE_ENV || 'development'
-  });
-});
 
-// Debug endpoint to check admin user in database
-app.get('/debug-admin', async (req, res) => {
-  try {
-    const adminUser = await User.findOne({ username: 'admin' });
-    res.json({
-      exists: !!adminUser,
-      username: adminUser ? adminUser.username : null,
-      email: adminUser ? adminUser.email : null,
-      role: adminUser ? adminUser.role : null,
-      createdAt: adminUser ? adminUser.createdAt : null,
-      passwordSet: adminUser ? !!adminUser.password : false
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Reset admin password endpoint (for fixing password issues)
-app.post('/reset-admin-password', async (req, res) => {
-  try {
-    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
-    const hashedPassword = await bcrypt.hash(adminPassword, 10);
-    
-    const result = await User.updateOne(
-      { username: 'admin' },
-      { password: hashedPassword }
-    );
-    
-    res.json({ 
-      success: true,
-      message: 'Admin password reset successfully',
-      modified: result.modifiedCount > 0
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
 
 // MongoDB Atlas connection
 const connectDB = async () => {
@@ -538,12 +490,6 @@ app.use((req, res) => {
 // Start server
 const startServer = async () => {
   try {
-    console.log('🔄 Starting server...');
-    console.log('📋 Environment variables loaded:');
-    console.log(`   ADMIN_USERNAME: ${process.env.ADMIN_USERNAME || 'NOT SET'}`);
-    console.log(`   ADMIN_PASSWORD: ${process.env.ADMIN_PASSWORD ? 'SET' : 'NOT SET'}`);
-    console.log(`   MONGODB_URI: ${process.env.MONGODB_URI ? 'SET' : 'NOT SET'}`);
-    
     await connectDB();
     await initializeDatabase();
     
