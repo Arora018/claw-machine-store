@@ -27,7 +27,7 @@ import { v4 as uuidv4 } from 'uuid';
 const { width, height } = Dimensions.get('window');
 
 // Cloud API Configuration - UPDATE THIS TO YOUR CLOUD URL
-const CLOUD_API_URL = 'https://your-railway-app-name.railway.app/api'; // UPDATE WITH YOUR RAILWAY URL!
+const CLOUD_API_URL = 'https://claw-machine-backend.onrender.com/api'; // Updated with Render URL
 const LOCAL_API_URL = 'http://localhost:3000/api'; // Fallback for development
 
 class OfflineDatabase {

@@ -11,6 +11,10 @@ const { URL } = require('url');
 const BACKEND_URL = 'https://yourapp-production-xxxx.up.railway.app';
 const ADMIN_URL = 'https://yourapp-xxxx.vercel.app';
 
+// Example URLs (replace with your actual ones):
+// BACKEND_URL = 'https://claw-machine-store-production-abc123.up.railway.app';
+// ADMIN_URL = 'https://claw-machine-store-def456.vercel.app';
+
 function makeRequest(url) {
   return new Promise((resolve, reject) => {
     const urlObj = new URL(url);
@@ -113,8 +117,11 @@ async function runTests() {
   if (BACKEND_URL.includes('yourapp-production-xxxx') || ADMIN_URL.includes('yourapp-xxxx')) {
     console.log('⚠️  Please update BACKEND_URL and ADMIN_URL in this script with your actual deployment URLs');
     console.log('📋 Your URLs should look like:');
-    console.log('   Backend: https://yourapp-production-abcd.up.railway.app');
-    console.log('   Admin: https://yourapp-efgh.vercel.app');
+    console.log('   Backend: https://claw-machine-store-production-abc123.up.railway.app');
+    console.log('   Admin: https://claw-machine-store-def456.vercel.app');
+    console.log('\n🔗 Find your URLs here:');
+    console.log('   Railway: https://railway.app/dashboard');
+    console.log('   Vercel: https://vercel.com/dashboard');
     return;
   }
   
