@@ -70,6 +70,7 @@ const connectDB = async () => {
 // User Schema
 const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
+  email: { type: String, required: false },
   password: { type: String, required: true },
   role: { type: String, enum: ['admin', 'manager', 'cashier'], default: 'cashier' },
   createdAt: { type: Date, default: Date.now }
