@@ -38,6 +38,18 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Debug endpoint to check environment variables (remove in production)
+app.get('/debug-env', (req, res) => {
+  res.json({
+    hasAdminUsername: !!process.env.ADMIN_USERNAME,
+    hasAdminPassword: !!process.env.ADMIN_PASSWORD,
+    hasAdminEmail: !!process.env.ADMIN_EMAIL,
+    adminUsername: process.env.ADMIN_USERNAME || 'NOT SET',
+    mongoUri: process.env.MONGODB_URI ? 'SET' : 'NOT SET',
+    nodeEnv: process.env.NODE_ENV || 'development'
+  });
+});
+
 // MongoDB Atlas connection
 const connectDB = async () => {
   try {
