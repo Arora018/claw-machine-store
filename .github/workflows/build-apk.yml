@@ -15,6 +15,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     
     steps:
       - name: Checkout code
@@ -31,38 +32,63 @@ jobs:
         run: |
           cd tablet-app
           npm ci
-
-      - name: Setup Expo CLI
+          
+      - name: Verify app configuration
         run: |
-          npm install -g @expo/cli
-          npm install -g eas-cli
+          cd tablet-app
+          echo "📋 App Configuration:"
+          cat app.json
+          echo "📋 EAS Configuration:"
+          cat eas.json
+          echo "📋 Package.json:"
+          cat package.json | grep -A 10 -B 5 "scripts\|dependencies"
+
+      - name: Setup EAS CLI
+        run: |
+          npm install -g @expo/cli@latest
+          npm install -g eas-cli@latest
+          echo "✅ EAS CLI installed"
+          eas --version
 
       - name: Check Expo token
         run: |
           if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
             echo "❌ EXPO_TOKEN secret is missing!"
-            echo "Please add EXPO_TOKEN to repository secrets"
+            echo "Go to: https://github.com/${{ github.repository }}/settings/secrets/actions"
+            echo "Add EXPO_TOKEN secret with your token from https://expo.dev/accounts/settings/access-tokens"
             exit 1
           fi
-          echo "✅ EXPO_TOKEN found"
+          echo "✅ EXPO_TOKEN found (length: ${#EXPO_TOKEN})"
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
       - name: Login to Expo
         run: |
           cd tablet-app
-          echo "${{ secrets.EXPO_TOKEN }}" | expo login --non-interactive
+          echo "🔑 Logging in to Expo..."
+          export EXPO_TOKEN="${{ secrets.EXPO_TOKEN }}"
+          eas whoami
+          echo "✅ Successfully authenticated with Expo"
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
       - name: Build APK
         run: |
           cd tablet-app
+          echo "🔨 Starting APK build..."
+          echo "Build type: ${{ github.event.inputs.build_type || 'preview' }}"
           eas build --platform android --profile ${{ github.event.inputs.build_type || 'preview' }} --non-interactive
+          echo "✅ Build completed successfully"
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        if: success()
-        with:
-          name: yanoi-pos-apk
-          path: tablet-app/build/ 
+      - name: Build status
+        if: always()
+        run: |
+          if [ $? -eq 0 ]; then
+            echo "🎉 Build completed successfully!"
+            echo "📱 Your APK should be available in the EAS dashboard"
+            echo "🔗 Check: https://expo.dev/accounts/$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')/projects/yanoi-pos/builds"
+          else
+            echo "❌ Build failed. Check the logs above for details."
+          fi 
