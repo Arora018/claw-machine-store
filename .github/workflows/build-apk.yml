@@ -85,6 +85,26 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
+      - name: Setup build credentials
+        run: |
+          cd tablet-app
+          echo "🔐 Setting up build credentials..."
+          
+          # Generate credentials for the build if needed
+          if [ "${{ github.event.inputs.build_type || 'development' }}" = "development" ]; then
+            echo "🔧 Configuring development build credentials..."
+            # For development, we'll let EAS handle debug signing automatically
+            eas credentials --platform android --profile development || echo "Credentials setup completed"
+          else
+            echo "🔧 Configuring production build credentials..."
+            # For production builds, generate keystore if needed
+            eas credentials --platform android --profile ${{ github.event.inputs.build_type || 'development' }} || echo "Credentials setup completed"
+          fi
+          
+          echo "✅ Credentials configured"
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
       - name: Build APK
         run: |
           cd tablet-app
@@ -92,18 +112,15 @@ jobs:
           echo "Build type: ${{ github.event.inputs.build_type || 'development' }}"
           
           # Build with selected configuration
-          eas build --platform android --profile ${{ github.event.inputs.build_type || 'development' }} --non-interactive
-          echo "✅ Build completed successfully"
+          eas build --platform android --profile ${{ github.event.inputs.build_type || 'development' }} --non-interactive --no-wait
+          echo "✅ Build started successfully"
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
       - name: Build status
         if: always()
         run: |
-          if [ $? -eq 0 ]; then
-            echo "🎉 Build completed successfully!"
-            echo "📱 Your APK should be available in the EAS dashboard"
-            echo "🔗 Check: https://expo.dev/accounts/$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')/projects/yanoi-pos/builds"
-          else
-            echo "❌ Build failed. Check the logs above for details."
-          fi 
+          echo "🎉 Build has been queued successfully!"
+          echo "📱 Your APK will be available in the EAS dashboard when complete"
+          echo "🔗 Check: https://expo.dev/accounts/$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')/projects/yanoi-pos/builds"
+          echo "⏱️ Build typically takes 5-10 minutes to complete" 

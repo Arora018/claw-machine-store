@@ -9,13 +9,19 @@
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleDebug"
+      },
+      "env": {
+        "EXPO_DEBUG": "true"
       }
     },
     "preview": {
-      "distribution": "internal",
+      "distribution": "internal", 
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleDebug"
+      },
+      "env": {
+        "EXPO_DEBUG": "true"
       }
     },
     "production": {
