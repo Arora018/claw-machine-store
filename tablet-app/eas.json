@@ -14,14 +14,12 @@
     "preview": {
       "distribution": "internal",
       "android": {
-        "buildType": "apk",
-        "buildEnvironment": "generic"
+        "buildType": "apk"
       }
     },
     "production": {
       "android": {
-        "buildType": "apk",
-        "buildEnvironment": "generic"
+        "buildType": "apk"
       }
     }
   },
