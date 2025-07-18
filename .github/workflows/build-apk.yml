@@ -72,6 +72,21 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
+      - name: Initialize EAS project
+        run: |
+          cd tablet-app
+          echo "🚀 Initializing EAS project..."
+          # Check if project already exists
+          if eas project:info --non-interactive 2>/dev/null; then
+            echo "✅ EAS project already exists"
+          else
+            echo "🔧 Creating new EAS project..."
+            eas init --non-interactive
+            echo "✅ EAS project initialized"
+          fi
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
       - name: Build APK
         run: |
           cd tablet-app

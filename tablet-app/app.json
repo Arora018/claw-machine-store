@@ -18,10 +18,16 @@
       "adaptiveIcon": {
         "backgroundColor": "#1976d2"
       },
-      "package": "com.yanoi.pos"
+      "package": "com.yanoi.pos",
+      "versionCode": 1
     },
     "web": {
       "bundler": "metro"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "yanoi-pos-project"
+      }
     }
   }
 }
