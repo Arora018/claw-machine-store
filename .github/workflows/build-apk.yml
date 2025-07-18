@@ -30,18 +30,35 @@ jobs:
       - name: Install dependencies
         run: |
           cd tablet-app
-          npm install
+          npm ci
 
-      - name: Setup EAS CLI
-        uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Setup Expo CLI
+        run: |
+          npm install -g @expo/cli
+          npm install -g eas-cli
+
+      - name: Check Expo token
+        run: |
+          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
+            echo "❌ EXPO_TOKEN secret is missing!"
+            echo "Please add EXPO_TOKEN to repository secrets"
+            exit 1
+          fi
+          echo "✅ EXPO_TOKEN found"
+
+      - name: Login to Expo
+        run: |
+          cd tablet-app
+          echo "${{ secrets.EXPO_TOKEN }}" | expo login --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
       - name: Build APK
         run: |
           cd tablet-app
-          eas build --platform android --profile ${{ github.event.inputs.build_type || 'preview' }} --non-interactive --no-wait
+          eas build --platform android --profile ${{ github.event.inputs.build_type || 'preview' }} --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
