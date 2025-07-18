@@ -15,7 +15,9 @@ import {
   Chip,
   Surface,
   ActivityIndicator,
-  Snackbar
+  Snackbar,
+  Menu,
+  Divider
 } from 'react-native-paper';
 import { StatusBar } from 'expo-status-bar';
 import axios from 'axios';
@@ -26,9 +28,44 @@ import { v4 as uuidv4 } from 'uuid';
 
 const { width, height } = Dimensions.get('window');
 
-// Cloud API Configuration - UPDATE THIS TO YOUR CLOUD URL
-const CLOUD_API_URL = 'https://claw-machine-backend.onrender.com/api'; // Updated with Render URL
-const LOCAL_API_URL = 'http://localhost:3000/api'; // Fallback for development
+// Detect if device is tablet or phone
+const isTablet = width >= 768;
+
+// Cloud API Configuration
+const CLOUD_API_URL = 'https://claw-machine-backend.onrender.com/api';
+const LOCAL_API_URL = 'http://localhost:3000/api';
+
+// Predefined store configurations (can be expanded)
+const STORE_CONFIGS = [
+  {
+    id: 'yanoi-main',
+    name: 'Yanoi Main Store',
+    location: 'Main Location',
+    apiUrl: CLOUD_API_URL,
+    defaultUsername: 'admin'
+  },
+  {
+    id: 'yanoi-branch1',
+    name: 'Yanoi Branch 1',
+    location: 'Branch Location 1',
+    apiUrl: CLOUD_API_URL,
+    defaultUsername: 'admin'
+  },
+  {
+    id: 'yanoi-branch2',
+    name: 'Yanoi Branch 2',
+    location: 'Branch Location 2',
+    apiUrl: CLOUD_API_URL,
+    defaultUsername: 'admin'
+  },
+  {
+    id: 'custom',
+    name: 'Custom Store',
+    location: 'Custom Location',
+    apiUrl: CLOUD_API_URL,
+    defaultUsername: ''
+  }
+];
 
 class OfflineDatabase {
   constructor() {
@@ -47,7 +84,16 @@ class OfflineDatabase {
         id TEXT PRIMARY KEY,
         username TEXT NOT NULL,
         token TEXT,
-        role TEXT
+        role TEXT,
+        storeId TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS stores (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        location TEXT,
+        apiUrl TEXT,
+        lastUsed INTEGER DEFAULT 0
       );
 
       CREATE TABLE IF NOT EXISTS products (
@@ -56,7 +102,8 @@ class OfflineDatabase {
         price INTEGER NOT NULL,
         category TEXT,
         isActive INTEGER DEFAULT 1,
-        synced INTEGER DEFAULT 0
+        synced INTEGER DEFAULT 0,
+        storeId TEXT
       );
 
       CREATE TABLE IF NOT EXISTS sales (
@@ -67,7 +114,8 @@ class OfflineDatabase {
         total INTEGER NOT NULL,
         timestamp TEXT NOT NULL,
         cashier TEXT,
-        synced INTEGER DEFAULT 0
+        synced INTEGER DEFAULT 0,
+        storeId TEXT
       );
 
       CREATE TABLE IF NOT EXISTS machines (
@@ -79,44 +127,79 @@ class OfflineDatabase {
         coinCount INTEGER,
         currentToyCount INTEGER,
         maxCapacity INTEGER,
-        synced INTEGER DEFAULT 0
+        synced INTEGER DEFAULT 0,
+        storeId TEXT
       );
     `);
   }
 
-  async getProducts() {
-    const result = await this.db.getAllAsync('SELECT * FROM products WHERE isActive = 1');
+  // Store management methods
+  async saveStore(store) {
+    await this.db.runAsync(
+      'INSERT OR REPLACE INTO stores (id, name, location, apiUrl, lastUsed) VALUES (?, ?, ?, ?, ?)',
+      [store.id, store.name, store.location, store.apiUrl, Date.now()]
+    );
+  }
+
+  async getStores() {
+    const result = await this.db.getAllAsync('SELECT * FROM stores ORDER BY lastUsed DESC');
     return result;
   }
 
-  async saveProducts(products) {
+  async getLastUsedStore() {
+    const result = await this.db.getFirstAsync('SELECT * FROM stores ORDER BY lastUsed DESC LIMIT 1');
+    return result;
+  }
+
+  async saveUser(user) {
+    await this.db.runAsync(
+      'INSERT OR REPLACE INTO users (id, username, token, role, storeId) VALUES (?, ?, ?, ?, ?)',
+      [user.id, user.username, user.token, user.role, user.storeId || '']
+    );
+  }
+
+  async getUser() {
+    const result = await this.db.getFirstAsync('SELECT * FROM users LIMIT 1');
+    return result;
+  }
+
+  async saveProducts(products, storeId) {
     for (const product of products) {
       await this.db.runAsync(
-        'INSERT OR REPLACE INTO products (id, name, price, category, isActive, synced) VALUES (?, ?, ?, ?, ?, ?)',
-        [product._id || product.id, product.name, product.price, product.category, 1, 1]
+        'INSERT OR REPLACE INTO products (id, name, price, category, isActive, storeId) VALUES (?, ?, ?, ?, ?, ?)',
+        [product.id, product.name, product.price, product.category, product.isActive ? 1 : 0, storeId]
       );
     }
   }
 
-  async saveSale(sale) {
+  async getProducts(storeId) {
+    const result = await this.db.getAllAsync(
+      'SELECT * FROM products WHERE storeId = ? AND isActive = 1', 
+      [storeId]
+    );
+    return result;
+  }
+
+  async saveSale(sale, storeId) {
     await this.db.runAsync(
-      'INSERT OR REPLACE INTO sales (id, clientId, items, paymentMethod, total, timestamp, cashier, synced) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [sale.id, sale.clientId, JSON.stringify(sale.items), sale.paymentMethod, sale.total, sale.timestamp, sale.cashier || 'admin', 0]
+      'INSERT OR REPLACE INTO sales (id, clientId, items, paymentMethod, total, timestamp, cashier, storeId) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [sale.id, sale.clientId, JSON.stringify(sale.items), sale.paymentMethod, sale.total, sale.timestamp, sale.cashier, storeId]
     );
   }
 
-  async getUnsyncedSales() {
-    const result = await this.db.getAllAsync('SELECT * FROM sales WHERE synced = 0');
+  async getPendingSales(storeId) {
+    const result = await this.db.getAllAsync(
+      'SELECT * FROM sales WHERE synced = 0 AND storeId = ?', 
+      [storeId]
+    );
     return result.map(sale => ({
       ...sale,
       items: JSON.parse(sale.items)
     }));
   }
 
-  async markSalesAsSynced(salesIds) {
-    for (const id of salesIds) {
-      await this.db.runAsync('UPDATE sales SET synced = 1 WHERE id = ?', [id]);
-    }
+  async markSaleSynced(id) {
+    await this.db.runAsync('UPDATE sales SET synced = 1 WHERE id = ?', [id]);
   }
 
   async getSalesCount() {
@@ -124,121 +207,85 @@ class OfflineDatabase {
     return result.count;
   }
 
-  async saveUser(user) {
-    await this.db.runAsync(
-      'INSERT OR REPLACE INTO users (id, username, token, role) VALUES (?, ?, ?, ?)',
-      [user.id, user.username, user.token, user.role]
-    );
-  }
-
-  async getUser() {
-    return await this.db.getFirstAsync('SELECT * FROM users LIMIT 1');
-  }
-
-  async clearUser() {
+  async clearUserData() {
     await this.db.runAsync('DELETE FROM users');
   }
 }
 
 export default function App() {
-  const [db] = useState(new OfflineDatabase());
-  const [user, setUser] = useState(null);
+  // State management
+  const [showLogin, setShowLogin] = useState(true);
+  const [showStoreSelection, setShowStoreSelection] = useState(false);
+  const [selectedStore, setSelectedStore] = useState(null);
+  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+  const [customStoreForm, setCustomStoreForm] = useState({ name: '', location: '', apiUrl: CLOUD_API_URL });
+  const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [isOnline, setIsOnline] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [pendingSalesCount, setPendingSalesCount] = useState(0);
-  const [showLogin, setShowLogin] = useState(true);
-  const [showInventory, setShowInventory] = useState(false);
-  const [loginForm, setLoginForm] = useState({ username: 'admin', password: 'admin123' });
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('cash');
+  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
+  const [lastSync, setLastSync] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [storeMenuVisible, setStoreMenuVisible] = useState(false);
+  const [showCustomStoreDialog, setShowCustomStoreDialog] = useState(false);
 
-  const api = axios.create({
-    baseURL: CLOUD_API_URL,
-    timeout: 10000,
-  });
+  // Database and API instances
+  const [db] = useState(() => new OfflineDatabase());
+  const [api] = useState(() => axios.create({ baseURL: CLOUD_API_URL }));
+  const [localApi] = useState(() => axios.create({ baseURL: LOCAL_API_URL }));
 
+  // Check for saved user and store on app start
   useEffect(() => {
-    initializeApp();
-    setupNetworkListener();
+    checkSavedSession();
+    checkNetworkStatus();
   }, []);
 
+  // Network status monitoring
   useEffect(() => {
-    calculateTotal();
-  }, [cart]);
-
-  useEffect(() => {
-    if (isOnline && user) {
-      syncData();
-    }
-  }, [isOnline, user]);
-
-  const initializeApp = async () => {
-    try {
-      // Wait for database to initialize
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Try to restore user session
-      const savedUser = await db.getUser();
-      if (savedUser) {
-        setUser(savedUser);
-        setShowLogin(false);
-        api.defaults.headers.common['Authorization'] = `Bearer ${savedUser.token}`;
-      }
-
-      // Load cached products
-      const cachedProducts = await db.getProducts();
-      if (cachedProducts.length > 0) {
-        setProducts(cachedProducts);
-      } else {
-        // Load default products if no cache
-        await loadDefaultProducts();
-      }
-
-      // Get pending sales count
-      const count = await db.getSalesCount();
-      setPendingSalesCount(count);
-
-      setLoading(false);
-    } catch (error) {
-      console.error('App initialization error:', error);
-      await loadDefaultProducts();
-      setLoading(false);
-    }
-  };
-
-  const loadDefaultProducts = async () => {
-    const defaultProducts = [
-      { id: '1', name: '1 Coin', price: 100, category: 'coins' },
-      { id: '2', name: '7 Coins', price: 500, category: 'coins' },
-      { id: '3', name: '15 Coins', price: 1000, category: 'coins' },
-      { id: '4', name: 'Teddy Bear', price: 250, category: 'plush_toy' },
-      { id: '5', name: 'Pokemon Figure', price: 400, category: 'figurine' },
-      { id: '6', name: 'Hello Kitty Plush', price: 350, category: 'plush_toy' },
-      { id: '7', name: 'Gummy Bears', price: 80, category: 'candy' }
-    ];
-    setProducts(defaultProducts);
-    await db.saveProducts(defaultProducts);
-  };
-
-  const setupNetworkListener = () => {
     const unsubscribe = NetInfo.addEventListener(state => {
-      const wasOnline = isOnline;
-      const nowOnline = state.isConnected && state.isInternetReachable;
-      setIsOnline(nowOnline);
-      
-      if (!wasOnline && nowOnline) {
-        showSnackbar('🟢 Back online - syncing data...');
-      } else if (wasOnline && !nowOnline) {
-        showSnackbar('🔴 Offline mode - data will sync when connected');
+      setIsOnline(state.isConnected);
+      if (state.isConnected && selectedStore) {
+        syncData();
       }
     });
-
     return unsubscribe;
+  }, [selectedStore]);
+
+  const checkSavedSession = async () => {
+    try {
+      const savedUser = await db.getUser();
+      const lastStore = await db.getLastUsedStore();
+      
+      if (savedUser && savedUser.token && lastStore) {
+        setCurrentUser(savedUser);
+        setSelectedStore(lastStore);
+        setShowLogin(false);
+        setShowStoreSelection(false);
+        
+        // Set up API with saved token
+        api.defaults.baseURL = lastStore.apiUrl;
+        api.defaults.headers.common['Authorization'] = `Bearer ${savedUser.token}`;
+        
+        loadProducts();
+      } else if (lastStore) {
+        setSelectedStore(lastStore);
+        setShowStoreSelection(false);
+        setLoginForm({ ...loginForm, username: lastStore.defaultUsername || '' });
+      } else {
+        setShowStoreSelection(true);
+        setShowLogin(false);
+      }
+    } catch (error) {
+      console.error('Error checking saved session:', error);
+    }
+  };
+
+  const checkNetworkStatus = async () => {
+    const state = await NetInfo.fetch();
+    setIsOnline(state.isConnected);
   };
 
   const showSnackbar = (message) => {
@@ -246,215 +293,310 @@ export default function App() {
     setSnackbarVisible(true);
   };
 
-  const login = async () => {
+  const selectStore = async (storeConfig) => {
     try {
       setLoading(true);
-      let response;
       
-      try {
-        // Try cloud API first
-        response = await api.post('/auth/login', loginForm);
-      } catch (error) {
-        // Fallback to local API
-        const localApi = axios.create({ baseURL: LOCAL_API_URL, timeout: 5000 });
-        response = await localApi.post('/auth/login', loginForm);
-      }
-
-      const { token, user: userData } = response.data;
+      // Save store to database
+      await db.saveStore(storeConfig);
       
-      const userWithToken = { ...userData, token };
-      setUser(userWithToken);
-      await db.saveUser(userWithToken);
+      // Set selected store
+      setSelectedStore(storeConfig);
+      setShowStoreSelection(false);
+      setShowLogin(true);
       
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      setShowLogin(false);
-      showSnackbar('✅ Login successful!');
+      // Set API base URL
+      api.defaults.baseURL = storeConfig.apiUrl;
       
-      // Fetch fresh data if online
-      if (isOnline) {
-        await fetchCloudData();
-      }
+      // Set default username
+      setLoginForm({ username: storeConfig.defaultUsername || '', password: '' });
+      
+      showSnackbar(`Selected store: ${storeConfig.name}`);
     } catch (error) {
-      // Demo mode for offline testing
-      if (loginForm.username === 'admin' && loginForm.password === 'admin123') {
-        const demoUser = { id: 'demo', username: 'admin', role: 'admin', token: 'demo-token' };
-        setUser(demoUser);
-        await db.saveUser(demoUser);
-        setShowLogin(false);
-        showSnackbar('🔄 Offline login successful!');
-      } else {
-        Alert.alert('Error', 'Invalid credentials or connection failed');
-      }
+      console.error('Error selecting store:', error);
+      showSnackbar('Error selecting store');
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchCloudData = async () => {
-    try {
-      const [productsResponse] = await Promise.all([
-        api.get('/products')
-      ]);
+  const createCustomStore = async () => {
+    if (!customStoreForm.name.trim()) {
+      showSnackbar('Please enter a store name');
+      return;
+    }
 
-      if (productsResponse.data.products) {
-        setProducts(productsResponse.data.products);
-        await db.saveProducts(productsResponse.data.products);
+    const customStore = {
+      id: `custom-${Date.now()}`,
+      name: customStoreForm.name,
+      location: customStoreForm.location,
+      apiUrl: customStoreForm.apiUrl || CLOUD_API_URL,
+      defaultUsername: ''
+    };
+
+    await selectStore(customStore);
+    setShowCustomStoreDialog(false);
+    setCustomStoreForm({ name: '', location: '', apiUrl: CLOUD_API_URL });
+  };
+
+  const login = async () => {
+    if (!loginForm.username.trim() || !loginForm.password.trim()) {
+      showSnackbar('Please enter both username and password');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      let response;
+      
+      if (isOnline) {
+        try {
+          response = await api.post('/auth/login', loginForm);
+        } catch (error) {
+          console.log('Cloud login failed, trying local...');
+          response = await localApi.post('/auth/login', loginForm);
+        }
+      }
+
+      if (response && response.data) {
+        const { token, user } = response.data;
+        
+        // Save user with store info
+        const userWithStore = { ...user, token, storeId: selectedStore.id };
+        await db.saveUser(userWithStore);
+        
+        setCurrentUser(userWithStore);
+        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        setShowLogin(false);
+        showSnackbar('✅ Login successful!');
+        
+        // Clear password from form for security
+        setLoginForm({ ...loginForm, password: '' });
+        
+        loadProducts();
       }
     } catch (error) {
-      console.log('Failed to fetch cloud data:', error.message);
+      console.error('Login error:', error);
+      showSnackbar('❌ Login failed. Please check your credentials.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await db.clearUserData();
+      setCurrentUser(null);
+      setShowLogin(true);
+      setShowStoreSelection(false);
+      setCart([]);
+      setProducts([]);
+      api.defaults.headers.common['Authorization'] = '';
+      setLoginForm({ username: selectedStore?.defaultUsername || '', password: '' });
+      showSnackbar('Logged out successfully');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
+  const switchStore = () => {
+    setShowStoreSelection(true);
+    setShowLogin(false);
+  };
+
+  const loadProducts = async () => {
+    try {
+      if (isOnline) {
+        const response = await api.get('/products');
+        setProducts(response.data);
+        await db.saveProducts(response.data, selectedStore.id);
+        setLastSync(new Date());
+      } else {
+        const offlineProducts = await db.getProducts(selectedStore.id);
+        setProducts(offlineProducts);
+      }
+    } catch (error) {
+      console.error('Error loading products:', error);
+      const offlineProducts = await db.getProducts(selectedStore.id);
+      setProducts(offlineProducts);
     }
   };
 
   const syncData = async () => {
-    if (!isOnline || isSyncing) return;
+    if (!isOnline || !selectedStore) return;
 
     try {
-      setIsSyncing(true);
+      const pendingSales = await db.getPendingSales(selectedStore.id);
       
-      // Upload pending sales
-      const unsyncedSales = await db.getUnsyncedSales();
-      if (unsyncedSales.length > 0) {
-        const response = await api.post('/sync/sales/bulk', { sales: unsyncedSales });
-        if (response.status === 200) {
-          await db.markSalesAsSynced(unsyncedSales.map(s => s.id));
-          const newCount = await db.getSalesCount();
-          setPendingSalesCount(newCount);
-          showSnackbar(`✅ Synced ${unsyncedSales.length} sales to cloud`);
+      for (const sale of pendingSales) {
+        try {
+          await api.post('/sales', {
+            items: sale.items,
+            paymentMethod: sale.paymentMethod,
+            total: sale.total,
+            timestamp: sale.timestamp,
+            cashier: sale.cashier
+          });
+          await db.markSaleSynced(sale.id);
+        } catch (error) {
+          console.error('Error syncing sale:', error);
         }
       }
-
-      // Fetch fresh data
-      await fetchCloudData();
+      
+      loadProducts();
+      setLastSync(new Date());
     } catch (error) {
-      console.log('Sync failed:', error.message);
-      showSnackbar('⚠️ Sync failed - will retry when connection improves');
-    } finally {
-      setIsSyncing(false);
+      console.error('Sync error:', error);
     }
   };
 
   const addToCart = (product) => {
-    const existingItem = cart.find(item => item.product.id === product.id);
+    const existingItem = cart.find(item => item.id === product.id);
+    
     if (existingItem) {
-      setCart(cart.map(item => 
-        item.product.id === product.id 
+      setCart(cart.map(item =>
+        item.id === product.id
           ? { ...item, quantity: item.quantity + 1 }
           : item
       ));
     } else {
-      setCart([...cart, { product, quantity: 1 }]);
+      setCart([...cart, { ...product, quantity: 1 }]);
     }
   };
 
-  const updateQuantity = (productId, change) => {
-    setCart(cart.map(item => {
-      if (item.product.id === productId) {
-        const newQuantity = item.quantity + change;
-        return newQuantity > 0 ? { ...item, quantity: newQuantity } : null;
-      }
-      return item;
-    }).filter(Boolean));
-  };
-
   const removeFromCart = (productId) => {
-    setCart(cart.filter(item => item.product.id !== productId));
+    setCart(cart.filter(item => item.id !== productId));
   };
 
-  const calculateTotal = () => {
-    const subtotal = cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-    setTotal(subtotal);
+  const updateQuantity = (productId, newQuantity) => {
+    if (newQuantity <= 0) {
+      removeFromCart(productId);
+      return;
+    }
+    
+    setCart(cart.map(item =>
+      item.id === productId
+        ? { ...item, quantity: newQuantity }
+        : item
+    ));
+  };
+
+  const getCartTotal = () => {
+    return cart.reduce((total, item) => total + (item.price * item.quantity), 0);
   };
 
   const processSale = async () => {
     if (cart.length === 0) {
-      Alert.alert('Error', 'Cart is empty');
+      showSnackbar('Cart is empty');
       return;
     }
 
-    Alert.alert(
-      'Confirm Sale',
-      `Process sale for ₹${total} via ${selectedPaymentMethod.toUpperCase()}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Confirm', onPress: async () => {
-          try {
-            const sale = {
-              id: uuidv4(),
-              clientId: uuidv4(),
-              items: cart.map(item => ({
-                product: item.product.id,
-                quantity: item.quantity
-              })),
-              paymentMethod: selectedPaymentMethod,
-              total: total,
-              timestamp: new Date().toISOString(),
-              cashier: user?.username || 'admin'
-            };
+    const sale = {
+      id: uuidv4(),
+      clientId: uuidv4(),
+      items: cart,
+      paymentMethod,
+      total: getCartTotal(),
+      timestamp: new Date().toISOString(),
+      cashier: currentUser?.username || 'Unknown'
+    };
 
-            // Save to local database first
-            await db.saveSale(sale);
-            
-            // Try to sync immediately if online
-            if (isOnline) {
-              try {
-                await api.post('/sales', sale);
-                await db.markSalesAsSynced([sale.id]);
-                showSnackbar(`✅ Sale completed and synced to cloud!`);
-              } catch (error) {
-                showSnackbar(`💾 Sale saved locally - will sync when connected`);
-              }
-            } else {
-              showSnackbar(`💾 Sale saved offline - will sync when connected`);
-            }
-
-            const newCount = await db.getSalesCount();
-            setPendingSalesCount(newCount);
-            
-            setCart([]);
-            setTotal(0);
-            setSelectedPaymentMethod('cash');
-          } catch (error) {
-            Alert.alert('Error', 'Failed to process sale');
-          }
-        }}
-      ]
-    );
+    try {
+      if (isOnline) {
+        await api.post('/sales', sale);
+        showSnackbar('✅ Sale completed and synced');
+      } else {
+        await db.saveSale(sale, selectedStore.id);
+        showSnackbar('✅ Sale saved (will sync when online)');
+      }
+      
+      setCart([]);
+      setShowPaymentDialog(false);
+      setPaymentMethod('cash');
+    } catch (error) {
+      console.error('Sale error:', error);
+      await db.saveSale(sale, selectedStore.id);
+      showSnackbar('✅ Sale saved locally');
+      setCart([]);
+      setShowPaymentDialog(false);
+      setPaymentMethod('cash');
+    }
   };
 
-  const logout = async () => {
-    await db.clearUser();
-    setUser(null);
-    setShowLogin(true);
-    setCart([]);
-    setSelectedPaymentMethod('cash');
-    api.defaults.headers.common['Authorization'] = '';
-  };
-
-  const getConnectionStatus = () => {
-    if (isSyncing) return { text: 'Syncing...', color: '#2196F3' };
-    if (isOnline) return { text: 'Online', color: '#4CAF50' };
-    return { text: 'Offline', color: '#FF9800' };
-  };
-
-  if (loading) {
+  // Store Selection Screen
+  if (showStoreSelection) {
     return (
       <PaperProvider>
-        <View style={[styles.container, styles.centered]}>
-          <ActivityIndicator size="large" />
-          <Text style={{ marginTop: 16 }}>Loading...</Text>
+        <View style={styles.container}>
+          <Appbar.Header>
+            <Appbar.Content title="Select Store" />
+          </Appbar.Header>
+          
+          <ScrollView style={styles.content}>
+            <Title style={styles.sectionTitle}>Choose Your Store</Title>
+            
+            {STORE_CONFIGS.slice(0, -1).map(store => (
+              <Card key={store.id} style={styles.storeCard} onPress={() => selectStore(store)}>
+                <Card.Content>
+                  <Title>{store.name}</Title>
+                  <Text>{store.location}</Text>
+                </Card.Content>
+              </Card>
+            ))}
+            
+            <Card style={styles.storeCard} onPress={() => setShowCustomStoreDialog(true)}>
+              <Card.Content>
+                <Title>+ Add Custom Store</Title>
+                <Text>Configure your own store settings</Text>
+              </Card.Content>
+            </Card>
+          </ScrollView>
+
+          {/* Custom Store Dialog */}
+          <Portal>
+            <Dialog visible={showCustomStoreDialog} onDismiss={() => setShowCustomStoreDialog(false)}>
+              <Dialog.Title>Add Custom Store</Dialog.Title>
+              <Dialog.Content>
+                <TextInput
+                  label="Store Name"
+                  value={customStoreForm.name}
+                  onChangeText={(text) => setCustomStoreForm({...customStoreForm, name: text})}
+                  style={styles.input}
+                />
+                <TextInput
+                  label="Location"
+                  value={customStoreForm.location}
+                  onChangeText={(text) => setCustomStoreForm({...customStoreForm, location: text})}
+                  style={styles.input}
+                />
+                <TextInput
+                  label="API URL"
+                  value={customStoreForm.apiUrl}
+                  onChangeText={(text) => setCustomStoreForm({...customStoreForm, apiUrl: text})}
+                  style={styles.input}
+                />
+              </Dialog.Content>
+              <Dialog.Actions>
+                <Button onPress={() => setShowCustomStoreDialog(false)}>Cancel</Button>
+                <Button onPress={createCustomStore}>Add Store</Button>
+              </Dialog.Actions>
+            </Dialog>
+          </Portal>
         </View>
       </PaperProvider>
     );
   }
 
+  // Login Screen
   if (showLogin) {
     return (
       <PaperProvider>
         <View style={styles.container}>
-          <StatusBar style="auto" />
           <View style={styles.loginContainer}>
-            <Title style={styles.title}>Claw Machine Store</Title>
-            <Text style={styles.subtitle}>Offline POS System</Text>
+            <Title style={styles.loginTitle}>Yanoi POS</Title>
+            <Text style={styles.storeInfo}>
+              {selectedStore?.name} - {selectedStore?.location}
+            </Text>
             
             <TextInput
               label="Username"
@@ -463,6 +605,7 @@ export default function App() {
               style={styles.input}
               autoCapitalize="none"
             />
+            
             <TextInput
               label="Password"
               value={loginForm.password}
@@ -470,150 +613,183 @@ export default function App() {
               secureTextEntry
               style={styles.input}
             />
-            <Button mode="contained" onPress={login} style={styles.button} disabled={loading}>
+            
+            <Button 
+              mode="contained" 
+              onPress={login} 
+              style={styles.button} 
+              disabled={loading}
+            >
               {loading ? 'Logging in...' : 'Login'}
             </Button>
-            <Text style={styles.hint}>
-              Default: admin / admin123 (works offline)
-            </Text>
+            
+            <Button 
+              mode="text" 
+              onPress={switchStore}
+              style={styles.switchStoreButton}
+            >
+              Switch Store
+            </Button>
           </View>
         </View>
       </PaperProvider>
     );
   }
 
-  if (showInventory) {
-    return (
-      <PaperProvider>
-        <View style={styles.container}>
-          <Appbar.Header>
-            <Appbar.Content title="Inventory" />
-            <Appbar.Action icon="point-of-sale" onPress={() => setShowInventory(false)} />
-            <Appbar.Action icon="logout" onPress={logout} />
-          </Appbar.Header>
-          
-          <ScrollView style={styles.content}>
-            <View style={styles.statusBar}>
-              <Chip mode="outlined" icon="wifi" style={{ backgroundColor: getConnectionStatus().color }}>
-                {getConnectionStatus().text}
-              </Chip>
-              {pendingSalesCount > 0 && (
-                <Chip mode="outlined" icon="database" style={{ backgroundColor: '#FF5722' }}>
-                  {pendingSalesCount} pending
-                </Chip>
-              )}
-            </View>
-
-            <Title>Products ({products.length})</Title>
-            {products.map(product => (
-              <List.Item
-                key={product.id || product._id}
-                title={product.name}
-                description={`₹${product.price} - ${product.category?.replace('_', ' ')}`}
-                left={props => <List.Icon {...props} icon="package-variant" />}
-              />
-            ))}
-          </ScrollView>
-        </View>
-      </PaperProvider>
-    );
-  }
-
-  const status = getConnectionStatus();
-
+  // Main POS Screen
   return (
     <PaperProvider>
       <View style={styles.container}>
-        <StatusBar style="auto" />
         <Appbar.Header>
-          <Appbar.Content title={`POS - ${user?.username}`} />
-          <View style={styles.headerStatus}>
-            <Chip mode="outlined" icon="wifi" style={{ backgroundColor: status.color, marginRight: 8 }}>
-              {status.text}
-            </Chip>
-            {pendingSalesCount > 0 && (
-              <Chip mode="outlined" icon="database" style={{ backgroundColor: '#FF5722', marginRight: 8 }}>
-                {pendingSalesCount}
-              </Chip>
-            )}
-          </View>
-          <Appbar.Action icon="warehouse" onPress={() => setShowInventory(true)} />
-          <Appbar.Action icon="logout" onPress={logout} />
+          <Appbar.Content title="Yanoi POS" subtitle={selectedStore?.name} />
+          <Menu
+            visible={storeMenuVisible}
+            onDismiss={() => setStoreMenuVisible(false)}
+            anchor={
+              <Appbar.Action 
+                icon="store" 
+                onPress={() => setStoreMenuVisible(true)} 
+              />
+            }
+          >
+            <Menu.Item onPress={switchStore} title="Switch Store" />
+            <Divider />
+            <Menu.Item onPress={logout} title="Logout" />
+          </Menu>
         </Appbar.Header>
 
-        <View style={styles.mainContent}>
-          {/* Products Section */}
-          <View style={styles.productsSection}>
-            <Title>Products</Title>
-            {!isOnline && (
-              <Text style={styles.offlineNotice}>📱 Working offline - using cached data</Text>
+        <View style={styles.content}>
+          <View style={styles.statusBar}>
+            <Chip icon={isOnline ? "wifi" : "wifi-off"} mode="outlined">
+              {isOnline ? 'Online' : 'Offline'}
+            </Chip>
+            {lastSync && (
+              <Chip icon="sync" mode="outlined">
+                {`Synced: ${lastSync.toLocaleTimeString()}`}
+              </Chip>
             )}
-            <FlatList
-              data={products}
-              numColumns={2}
-              renderItem={({ item }) => (
-                <Card style={styles.productCard} onPress={() => addToCart(item)}>
-                  <Card.Content>
-                    <Text style={styles.productName}>{item.name}</Text>
-                    <Text style={styles.productPrice}>₹{item.price}</Text>
-                    <Text style={styles.productCategory}>{item.category?.replace('_', ' ')}</Text>
-                  </Card.Content>
-                </Card>
-              )}
-              keyExtractor={(item) => item.id || item._id}
-              showsVerticalScrollIndicator={false}
-            />
+            <Chip icon="account" mode="outlined">
+              {currentUser?.username}
+            </Chip>
           </View>
 
-          {/* Cart Section */}
-          <View style={styles.cartSection}>
-            <Title>Cart ({cart.length})</Title>
-            <ScrollView style={styles.cartItems}>
-              {cart.map(item => (
-                <Surface key={item.product.id} style={styles.cartItem}>
-                  <View style={styles.cartItemInfo}>
-                    <Text style={styles.cartItemName}>{item.product.name}</Text>
-                    <Text style={styles.cartItemPrice}>₹{item.product.price} × {item.quantity} = ₹{item.product.price * item.quantity}</Text>
-                  </View>
-                  <View style={styles.cartItemActions}>
-                    <Button mode="outlined" onPress={() => updateQuantity(item.product.id, -1)} compact>-</Button>
-                    <Text style={styles.quantity}>{item.quantity}</Text>
-                    <Button mode="outlined" onPress={() => updateQuantity(item.product.id, 1)} compact>+</Button>
-                    <Button mode="text" onPress={() => removeFromCart(item.product.id)} compact textColor="#F44336">×</Button>
-                  </View>
-                </Surface>
-              ))}
-            </ScrollView>
+          {!isOnline && (
+            <Text style={styles.offlineNotice}>
+              Operating in offline mode. Sales will sync when connection is restored.
+            </Text>
+          )}
 
-            <View style={styles.cartFooter}>
-              <Text style={styles.total}>Total: ₹{total}</Text>
+          <View style={[styles.mainContent, { flexDirection: isTablet ? 'row' : 'column' }]}>
+            {/* Products Section */}
+            <View style={[styles.productsSection, { flex: isTablet ? 2 : 1 }]}>
+              <Title>Products</Title>
+              <FlatList
+                data={products}
+                numColumns={isTablet ? 3 : 2}
+                key={isTablet ? 'tablet' : 'phone'}
+                renderItem={({ item }) => (
+                  <Card style={[styles.productCard, { width: isTablet ? '31%' : '48%' }]} onPress={() => addToCart(item)}>
+                    <Card.Content>
+                      <Text style={styles.productName}>{item.name}</Text>
+                      <Text style={styles.productPrice}>₹{item.price}</Text>
+                      <Text style={styles.productCategory}>{item.category}</Text>
+                    </Card.Content>
+                  </Card>
+                )}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={styles.productsList}
+              />
+            </View>
+
+            {/* Cart Section */}
+            <View style={[styles.cartSection, { flex: isTablet ? 1 : 1 }]}>
+              <Title>Cart ({cart.length})</Title>
               
-              <View style={styles.paymentMethods}>
-                {['cash', 'upi', 'card'].map(method => (
-                  <Button
-                    key={method}
-                    mode={selectedPaymentMethod === method ? 'contained' : 'outlined'}
-                    onPress={() => setSelectedPaymentMethod(method)}
-                    style={styles.paymentButton}
-                    compact
-                  >
-                    {method.toUpperCase()}
-                  </Button>
+              <ScrollView style={styles.cartItems}>
+                {cart.map(item => (
+                  <Surface key={item.id} style={styles.cartItem}>
+                    <View style={styles.cartItemInfo}>
+                      <Text style={styles.cartItemName}>{item.name}</Text>
+                      <Text style={styles.cartItemPrice}>₹{item.price} each</Text>
+                    </View>
+                    <View style={styles.cartItemActions}>
+                      <Button 
+                        mode="outlined" 
+                        compact 
+                        onPress={() => updateQuantity(item.id, item.quantity - 1)}
+                      >
+                        -
+                      </Button>
+                      <Text style={styles.quantity}>{item.quantity}</Text>
+                      <Button 
+                        mode="outlined" 
+                        compact 
+                        onPress={() => updateQuantity(item.id, item.quantity + 1)}
+                      >
+                        +
+                      </Button>
+                    </View>
+                  </Surface>
                 ))}
-              </View>
+              </ScrollView>
 
-              <Button 
-                mode="contained" 
-                onPress={processSale} 
-                disabled={cart.length === 0}
-                style={styles.checkoutButton}
-              >
-                Process Sale ({selectedPaymentMethod.toUpperCase()})
-              </Button>
+              <View style={styles.cartFooter}>
+                <Text style={styles.total}>Total: ₹{getCartTotal()}</Text>
+                
+                <View style={styles.paymentMethods}>
+                  <Button 
+                    mode={paymentMethod === 'cash' ? 'contained' : 'outlined'}
+                    onPress={() => setPaymentMethod('cash')}
+                    style={styles.paymentButton}
+                  >
+                    Cash
+                  </Button>
+                  <Button 
+                    mode={paymentMethod === 'card' ? 'contained' : 'outlined'}
+                    onPress={() => setPaymentMethod('card')}
+                    style={styles.paymentButton}
+                  >
+                    Card
+                  </Button>
+                  <Button 
+                    mode={paymentMethod === 'upi' ? 'contained' : 'outlined'}
+                    onPress={() => setPaymentMethod('upi')}
+                    style={styles.paymentButton}
+                  >
+                    UPI
+                  </Button>
+                </View>
+
+                <Button 
+                  mode="contained" 
+                  onPress={() => setShowPaymentDialog(true)}
+                  style={styles.checkoutButton}
+                  disabled={cart.length === 0}
+                >
+                  Complete Sale
+                </Button>
+              </View>
             </View>
           </View>
         </View>
 
+        {/* Payment Confirmation Dialog */}
+        <Portal>
+          <Dialog visible={showPaymentDialog} onDismiss={() => setShowPaymentDialog(false)}>
+            <Dialog.Title>Confirm Sale</Dialog.Title>
+            <Dialog.Content>
+              <Text>Total: ₹{getCartTotal()}</Text>
+              <Text>Payment Method: {paymentMethod.toUpperCase()}</Text>
+              <Text>Items: {cart.length}</Text>
+            </Dialog.Content>
+            <Dialog.Actions>
+              <Button onPress={() => setShowPaymentDialog(false)}>Cancel</Button>
+              <Button onPress={processSale}>Confirm</Button>
+            </Dialog.Actions>
+          </Dialog>
+        </Portal>
+
+        {/* Snackbar */}
         <Snackbar
           visible={snackbarVisible}
           onDismiss={() => setSnackbarVisible(false)}
@@ -631,9 +807,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
-  centered: {
-    justifyContent: 'center',
-    alignItems: 'center',
+  content: {
+    flex: 1,
+    padding: isTablet ? 16 : 8,
   },
   loginContainer: {
     flex: 1,
@@ -641,15 +817,16 @@ const styles = StyleSheet.create({
     padding: 32,
     maxWidth: 400,
     alignSelf: 'center',
+    width: '100%',
   },
-  title: {
-    fontSize: 28,
+  loginTitle: {
+    fontSize: 32,
+    fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 8,
     color: '#1976d2',
   },
-  subtitle: {
-    fontSize: 16,
+  storeInfo: {
     textAlign: 'center',
     marginBottom: 32,
     color: '#666',
@@ -658,44 +835,51 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   button: {
-    marginTop: 16,
+    marginBottom: 16,
     paddingVertical: 8,
   },
-  hint: {
-    textAlign: 'center',
+  switchStoreButton: {
     marginTop: 16,
-    color: '#666',
   },
-  headerStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  sectionTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  storeCard: {
+    marginBottom: 16,
+    elevation: 2,
   },
   mainContent: {
     flex: 1,
-    flexDirection: 'row',
+    gap: 16,
   },
   productsSection: {
-    flex: 2,
+    backgroundColor: 'white',
+    borderRadius: 8,
     padding: 16,
+    elevation: 2,
   },
   cartSection: {
-    flex: 1,
+    backgroundColor: 'white',
+    borderRadius: 8,
     padding: 16,
-    borderLeftWidth: 1,
-    borderLeftColor: '#e0e0e0',
+    elevation: 2,
+  },
+  productsList: {
+    gap: 8,
   },
   productCard: {
-    flex: 1,
     margin: 4,
-    minHeight: 120,
+    elevation: 1,
   },
   productName: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
-    marginBottom: 4,
   },
   productPrice: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#1976d2',
     fontWeight: 'bold',
   },
@@ -742,7 +926,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
   },
   total: {
-    fontSize: 24,
+    fontSize: isTablet ? 24 : 20,
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 16,
@@ -760,15 +944,12 @@ const styles = StyleSheet.create({
   checkoutButton: {
     paddingVertical: 8,
   },
-  content: {
-    flex: 1,
-    padding: 16,
-  },
   statusBar: {
     flexDirection: 'row',
     justifyContent: 'flex-start',
     marginBottom: 16,
     gap: 8,
+    flexWrap: 'wrap',
   },
   offlineNotice: {
     backgroundColor: '#ff9800',
@@ -779,3 +960,5 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
 });
+
+
