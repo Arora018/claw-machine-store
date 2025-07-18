@@ -76,30 +76,11 @@ jobs:
         run: |
           cd tablet-app
           echo "🚀 Initializing EAS project..."
-          # Remove any existing project ID to allow fresh initialization
-          if grep -q "extra.eas.projectId" app.json; then
-            echo "🔧 Removing existing project ID..."
-            # Create a clean app.json without the projectId
-            node -e "
-              const fs = require('fs');
-              const config = JSON.parse(fs.readFileSync('app.json', 'utf8'));
-              if (config.expo.extra?.eas?.projectId) {
-                delete config.expo.extra.eas.projectId;
-                if (Object.keys(config.expo.extra.eas).length === 0) {
-                  delete config.expo.extra.eas;
-                }
-                if (Object.keys(config.expo.extra).length === 0) {
-                  delete config.expo.extra;
-                }
-                fs.writeFileSync('app.json', JSON.stringify(config, null, 2));
-                console.log('✅ Cleaned app.json');
-              }
-            "
-          fi
+          echo "📋 Project will be created as: @${{ github.repository_owner }}/yanoi-pos"
           
-          # Initialize EAS project
-          eas init --non-interactive
-          echo "✅ EAS project initialized with new UUID"
+          # Initialize EAS project with force flag to create if it doesn't exist
+          eas init --force --non-interactive
+          echo "✅ EAS project initialized successfully"
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
