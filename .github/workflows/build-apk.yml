@@ -4,11 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       build_type:
-        description: 'Build type (preview or production)'
+        description: 'Build type (development or preview)'
         required: true
-        default: 'preview'
+        default: 'development'
         type: choice
         options:
+          - development
           - preview
           - production
 
@@ -88,8 +89,10 @@ jobs:
         run: |
           cd tablet-app
           echo "🔨 Starting APK build..."
-          echo "Build type: ${{ github.event.inputs.build_type || 'preview' }}"
-          eas build --platform android --profile ${{ github.event.inputs.build_type || 'preview' }} --non-interactive
+          echo "Build type: ${{ github.event.inputs.build_type || 'development' }}"
+          
+          # Build with selected configuration
+          eas build --platform android --profile ${{ github.event.inputs.build_type || 'development' }} --non-interactive
           echo "✅ Build completed successfully"
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
